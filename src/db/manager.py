@@ -20,6 +20,7 @@ class DatabaseManager:
 
     def _init_db(self):
         with self._get_connection() as conn:
+            # Activity blocks table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS activity_blocks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,7 +31,55 @@ class DatabaseManager:
                     duration_minutes INTEGER DEFAULT 1
                 )
             """)
+
+            # App categories mapping table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS app_categories (
+                    app_name TEXT PRIMARY KEY,
+                    category TEXT NOT NULL
+                )
+            """)
+
+            # Add some default mappings if they don't exist
+            default_mappings = [
+                ("code.exe", "Development"),
+                ("pycharm64.exe", "Development"),
+                ("chrome.exe", "Browsing"),
+                ("msedge.exe", "Browsing"),
+                ("vlc.exe", "Entertainment"),
+                ("spotify.exe", "Entertainment"),
+                ("discord.exe", "Social"),
+                ("slack.exe", "Social"),
+                ("cmd.exe", "System"),
+                ("powershell.exe", "System"),
+                ("explorer.exe", "System"),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO app_categories (app_name, category) VALUES (?, ?)",
+                default_mappings,
+            )
             conn.commit()
+
+    def set_app_category(self, app_name: str, category: str):
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO app_categories (app_name, category) VALUES (?, ?)",
+                (app_name, category),
+            )
+            conn.commit()
+
+    def get_app_category(self, app_name: str) -> str:
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT category FROM app_categories WHERE app_name = ?", (app_name,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else "Uncategorized"
+
+    def get_all_app_categories(self) -> dict:
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT app_name, category FROM app_categories")
+            return {row[0]: row[1] for row in cursor.fetchall()}
 
     def get_last_block(self) -> dict | None:
         with self._get_connection() as conn:
@@ -61,26 +110,58 @@ class DatabaseManager:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_app_usage_stats(self, date_str: str | None = None) -> list[dict]:
+    def get_app_usage_stats(
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> list[dict]:
         """
-        Returns total duration per app for a given date (YYYY-MM-DD).
-        If date_str is None, uses current date.
+        Returns total duration per app for a given date range (YYYY-MM-DD).
+        If dates are missing, defaults to today.
         """
-        if not date_str:
-            date_str = datetime.now().strftime("%Y-%m-%d")
+        if not start_date:
+            start_date = datetime.now().strftime("%Y-%m-%d")
+        if not end_date:
+            end_date = start_date
 
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            # We filter by start_time starting with date_str
             cursor = conn.execute(
                 """
-                SELECT app_name, SUM(duration_minutes) as total_duration
-                FROM activity_blocks
-                WHERE start_time LIKE ?
-                GROUP BY app_name
+                SELECT ab.app_name, SUM(ab.duration_minutes) as total_duration, 
+                       COALESCE(ac.category, 'Uncategorized') as category
+                FROM activity_blocks ab
+                LEFT JOIN app_categories ac ON ab.app_name = ac.app_name
+                WHERE date(ab.start_time) BETWEEN date(?) AND date(?)
+                GROUP BY ab.app_name
                 ORDER BY total_duration DESC
                 """,
-                (f"{date_str}%",),
+                (start_date, end_date),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_category_usage_stats(
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> list[dict]:
+        """
+        Returns total duration per category for a given date range.
+        """
+        if not start_date:
+            start_date = datetime.now().strftime("%Y-%m-%d")
+        if not end_date:
+            end_date = start_date
+
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT COALESCE(ac.category, 'Uncategorized') as category, 
+                       SUM(ab.duration_minutes) as total_duration
+                FROM activity_blocks ab
+                LEFT JOIN app_categories ac ON ab.app_name = ac.app_name
+                WHERE date(ab.start_time) BETWEEN date(?) AND date(?)
+                GROUP BY category
+                ORDER BY total_duration DESC
+                """,
+                (start_date, end_date),
             )
             return [dict(row) for row in cursor.fetchall()]
 
