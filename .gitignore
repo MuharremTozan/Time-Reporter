@@ -19,3 +19,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# AI Agents & IDE
+.agent/
+.ruff_cache/
+.cursorrules
+.opencode/
+AGENTS.md
