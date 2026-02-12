@@ -16,26 +16,28 @@ logging.basicConfig(
 
 
 def main():
-    # Initialize Database
-    db_manager = DatabaseManager()
-    # Initialize Exporter
-    exporter = ExportManager(db_manager)
-
     try:
-        # Initialize Engine
-        engine = TrackingEngine(db_manager, interval=60)
+        # 1. Initialize DB & Exporter
+        db_manager = DatabaseManager()
+        exporter = ExportManager(db_manager)
 
-        # Start Engine in a background thread
+        # 2. Cleanup
+        cleanup_days = int(db_manager.get_setting("db_cleanup_days", "30"))
+        db_manager.cleanup_old_data(days=cleanup_days)
+
+        # 3. Initialize UI First
+        app = DashboardApp(db_manager)
+
+        # 4. Initialize Engine
+        engine = TrackingEngine(db_manager, interval=60)
+        engine.on_idle_return_callback = app.show_idle_confirmation
+        app.set_engine(engine)
+
+        # 5. Start Engine in a background thread
         engine_thread = threading.Thread(target=engine.start, daemon=True)
         engine_thread.start()
 
-        # Initialize Exporter
-        exporter = ExportManager(db_manager)
-
-        # Initialize UI
-        app = DashboardApp(db_manager)
-
-        # Tray logic
+        # 6. Tray logic
         def on_tray_exit(icon):
             logging.info("Exiting via tray...")
             try:

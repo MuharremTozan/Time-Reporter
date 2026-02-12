@@ -1,6 +1,7 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import logging
 
 
 class DatabaseManager:
@@ -32,6 +33,28 @@ class DatabaseManager:
                 )
             """)
 
+            # Categories table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS categories (
+                    name TEXT PRIMARY KEY
+                )
+            """)
+
+            # Add default categories
+            default_categories = [
+                ("Development",),
+                ("Browsing",),
+                ("Entertainment",),
+                ("Social",),
+                ("System",),
+                ("Work",),
+                ("Education",),
+                ("Uncategorized",),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO categories (name) VALUES (?)", default_categories
+            )
+
             # App categories mapping table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS app_categories (
@@ -58,7 +81,77 @@ class DatabaseManager:
                 "INSERT OR IGNORE INTO app_categories (app_name, category) VALUES (?, ?)",
                 default_mappings,
             )
+
+            # Settings table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+
+            # Add default settings
+            default_settings = [
+                ("idle_threshold", "300"),
+                ("db_cleanup_days", "30"),
+                ("export_on_exit", "True"),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+                default_settings,
+            )
+
             conn.commit()
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else default
+
+    def set_setting(self, key: str, value: str):
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (key, str(value)),
+            )
+            conn.commit()
+
+    def cleanup_old_data(self, days: int = 30):
+        """Deletes activity blocks older than the specified number of days."""
+        cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM activity_blocks WHERE date(start_time) < ?", (cutoff_date,)
+            )
+            count = cursor.rowcount
+            conn.commit()
+            if count > 0:
+                logging.info(f"Cleaned up {count} records older than {cutoff_date}")
+            return count
+
+    def get_categories(self) -> list[str]:
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT name FROM categories ORDER BY name ASC")
+            return [row[0] for row in cursor.fetchall()]
+
+    def add_category(self, name: str):
+        with self._get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
+            conn.commit()
+
+    def delete_category(self, name: str):
+        if name == "Uncategorized":
+            return False
+        with self._get_connection() as conn:
+            # First, reset apps using this category to Uncategorized
+            conn.execute(
+                "UPDATE app_categories SET category = 'Uncategorized' WHERE category = ?",
+                (name,),
+            )
+            conn.execute("DELETE FROM categories WHERE name = ?", (name,))
+            conn.commit()
+            return True
 
     def set_app_category(self, app_name: str, category: str):
         with self._get_connection() as conn:
@@ -165,8 +258,12 @@ class DatabaseManager:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def update_last_block(self, block_id: int, duration_minutes: int):
-        now = datetime.now()
+    def update_last_block(
+        self, block_id: int, duration_minutes: int, end_time: datetime | None = None
+    ):
+        if end_time is None:
+            end_time = datetime.now()
+
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -174,6 +271,6 @@ class DatabaseManager:
                 SET end_time = ?, duration_minutes = ?
                 WHERE id = ?
                 """,
-                (now, duration_minutes, block_id),
+                (end_time, duration_minutes, block_id),
             )
             conn.commit()
