@@ -12,22 +12,29 @@
 
 - **🚀 Hybrid Tracking Engine:** 
   - **Event-Driven:** Uses Windows Hooks (`WinEventHook`) to detect window switches instantly.
-  - **Heartbeat:** Periodic updates every 60 seconds to ensure accuracy even during long sessions.
-- **⚡ Pro Performance:** Multi-threaded architecture with a non-polling message pump, resulting in **~0% CPU usage**.
-- **🔒 Privacy First:** All data is stored locally in a SQLite database. No cloud, no tracking, no data leakage.
-- **💤 Smart Idle Detection:** Automatically pauses tracking if no user input (mouse/keyboard) is detected for a specified duration (default: 5 mins).
-- **📊 Time-Block Logic:** Groups continuous activity into single blocks instead of cluttered per-minute records.
-- **📦 Zero Configuration:** Comes with a `run.bat` for automatic environment setup and launch.
+  - **Heartbeat:** Periodic updates every 60 seconds to ensure accuracy.
+- **📊 Modern Dashboard:** 
+  - **Real-time Stats:** Built with CustomTkinter for a sleek, dark-themed native Windows feel.
+  - **Visual Analytics:** Interactive pie charts showing usage by Application and Category.
+  - **Date Range Filters:** Quickly view stats for Today, Last 7 Days, or Last 30 Days.
+- **📂 Smart Export System:**
+  - **Auto-Logic:** Reconstructs your daily timeline, merging repetitive tasks and identifying breaks.
+  - **Local Files:** Exports clean `.txt` reports to the application directory on exit or on demand.
+- **🔒 Privacy & System:**
+  - **Local-First:** All data stays on your machine in a SQLite database.
+  - **System Tray:** Minimizes to tray for non-intrusive background operation.
+  - **Auto-Startup:** Option to run automatically when Windows starts.
+  - **Idle Detection:** Pauses tracking when you're away from your keyboard.
 
 ---
 
 ## 🛠 Tech Stack
 
 - **Core:** Python 3.10+
-- **APIs:** `pywin32` (Win32 API), `ctypes`
+- **UI:** CustomTkinter, Matplotlib
+- **APIs:** `pywin32` (Win32 API), `pystray`
 - **Database:** SQLite
-- **UI:** CustomTkinter (Coming Soon)
-- **Utilities:** `psutil`
+- **Utilities:** `psutil`, `Pillow`
 
 ---
 
@@ -38,17 +45,16 @@
 - Python 3.10 or higher
 
 ### Installation & Run
-The easiest way to start is using the provided batch file:
 
 1. Clone the repository:
    ```bash
    git clone https://github.com/yourusername/Time-Reporter.git
    cd Time-Reporter
    ```
-2. **Standard Run:** Double-click **`run.bat`**. (Shows terminal for logs)
+2. **Standard Run:** Double-click **`run.bat`**. (Installs dependencies and starts the app)
 3. **Professional Build:** Double-click **`build.bat`**. 
    - This creates a standalone **`main.exe`** in the `dist/` folder.
-   - The EXE runs **without a terminal window**, perfectly hidden in the background while the UI stays visible.
+   - The EXE runs **without a terminal window**, living in the system tray.
 
 ---
 
@@ -57,15 +63,15 @@ The easiest way to start is using the provided batch file:
 ```text
 /Time-Reporter
 ├── main.py              # Application entry point
-├── run.bat              # One-click launcher for Windows
+├── build.bat            # EXE compiler (PyInstaller)
+├── run.bat              # One-click launcher
 ├── requirements.txt     # Python dependencies
 ├── src/
 │   ├── core/            # Tracking engine & window hooks
 │   ├── db/              # SQLite database management
-│   ├── utils/           # Idle detection & system helpers
-│   └── ui/              # Desktop interface components
-├── documentation/       # Progress reports & technical docs
-└── .agent/              # AI Agent protocols & workflows
+│   ├── ui/              # CustomTkinter interface & charts
+│   └── utils/           # Tray, Export, Startup, and Idle helpers
+└── documentation/       # Technical status reports
 ```
 
 ---
@@ -74,30 +80,21 @@ The easiest way to start is using the provided batch file:
 
 - [x] Core Tracking Engine (Hybrid Model)
 - [x] SQLite Integration
-- [x] Idle Detection Logic
-- [x] Multi-threaded Architecture
-- [ ] **Modern Dashboard (CustomTkinter)**
-- [ ] **Data Visualization (Charts & Analytics)**
-- [ ] Application Categorization (Work, Play, Social)
-- [ ] System Tray Integration
+- [x] Modern Dashboard (CustomTkinter)
+- [x] Data Visualization (Pie Charts)
+- [x] Application Categorization
+- [x] System Tray Integration
+- [x] Windows Auto-startup
+- [x] Automatic/Manual Daily Export
+- [ ] Advanced Date Range Picker
+- [ ] Database Cleanup/Archiving Utilities
+- [ ] Custom User Categories
 
 ---
 
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 🤝 Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ---
 

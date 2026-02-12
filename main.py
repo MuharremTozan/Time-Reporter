@@ -43,7 +43,8 @@ def main():
             except Exception as e:
                 logging.error(f"Auto-export failed: {e}")
             icon.stop()
-            app.quit()
+            app.destroy()
+            sys.exit(0)
 
         def on_tray_show(icon):
             app.after(0, app.show_window)
@@ -69,10 +70,6 @@ def main():
     except Exception as e:
         logging.error(f"Fatal error: {e}")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":

@@ -7,43 +7,46 @@ Bu belge, yerel zaman takip uygulaması olan **Time Reporter** projesinin mevcut
 ### 1. Mimari Tasarım
 - **Dil:** Python 3.10+
 - **Veritabanı:** SQLite (Yerel dosya tabanlı saklama).
-- **Klasör Yapısı:** Modüler yapı (`src/core`, `src/db`, `src/utils`) oluşturuldu ve Python paket standartlarına (`__init__.py`) uygun hale getirildi.
+- **Arayüz:** CustomTkinter tabanlı modern ve karanlık tema odaklı UI.
+- **Klasör Yapısı:** Modüler yapı (`src/core`, `src/db`, `src/ui`, `src/utils`) oluşturuldu.
 
-### 2. Takip Motoru (Core Engine) - *Pro Seviye*
+### 2. Takip Motoru (Core Engine)
 - **Hibrit Takip Modeli:** 
-    - **Sinyal Tabanlı (Event-driven):** Windows `WinEventHook` kullanılarak pencere değişimleri milisaniye hassasiyetinde yakalanıyor.
-    - **Kalp Atışı (Heartbeat):** Pencere değişmese bile her 60 saniyede bir mevcut bloğun süresi güncelleniyor.
-- **Çoklu İş Parçacığı (Multi-threading):** Windows mesaj pompası (PumpMessages) ve zamanlayıcı ayrı thread'lerde çalışarak %0'a yakın CPU kullanımı sağlıyor.
+    - **Sinyal Tabanlı:** Pencere değişimleri Windows Hook'ları ile anlık yakalanıyor.
+    - **Heartbeat:** 60 saniyelik periyotlarla aktif bloğun süresi güncelleniyor.
+- **Çoklu İş Parçacığı:** Engine, Tray ve UI ayrı thread'lerde çalışarak donmaları engeller.
 
-### 3. Veri Yönetimi
-- **Blok Bazlı Kayıt:** Her dakika yeni satır eklemek yerine, aynı uygulama kullanıldığı sürece mevcut bloğun süresi artırılıyor (Time-blocking).
-- **Otomatik Şema:** Uygulama ilk açıldığında SQLite tablosunu (`activity_blocks`) otomatik olarak oluşturuyor.
+### 3. Kullanıcı Arayüzü (UI/UX)
+- **Dashboard:** Canlı takip kartı ve son 15 aktivite bloğunun listesi.
+- **İstatistikler:** Matplotlib entegrasyonu ile Uygulama ve Kategori bazlı pasta grafikler.
+- **Tarih Filtreleme:** İstatistikler için "Bugün", "Son 7 Gün" ve "Son 30 Gün" seçenekleri.
+- **Kategori Yönetimi:** Uygulamaları "Development", "Browsing", "Work" gibi kategorilere atama ekranı.
 
-### 4. Akıllı Özellikler
-- **Boşta Kalma (Idle) Tespiti:** Kullanıcı 5 dakika boyunca bilgisayarda işlem yapmazsa takip otomatik olarak durduruluyor.
-- **Proses Çözümleme:** Pencere başlığının ötesinde, arka planda çalışan gerçek `.exe` adı (örn: `chrome.exe`) tespit edilerek gruplandırma temeli atıldı.
+### 4. Sistem ve Arka Plan Entegrasyonu
+- **System Tray (Sistem Tepsisi):** Uygulama kapatıldığında kapanmaz, tepsiye küçülür. Sağ tık menüsü ile yönetilebilir.
+- **Auto-startup:** Windows açıldığında otomatik başlama seçeneği (Registry entegrasyonu).
+- **Akıllı Boşta Kalma Tespiti:** 5 dakika işlem yapılmazsa takibi durdurur.
 
-### 5. Kullanılabilirlik
-- **run.bat:** Kullanıcının terminalle uğraşmadan, çift tıklayarak sanal ortamı (venv) kurmasını ve uygulamayı başlatmasını sağlayan otomasyon dosyası.
-- **Loglama:** Tüm işlemler zaman damgalı olarak terminale ve sistem loglarına basılıyor.
+### 5. Raporlama ve Dışa Aktarma
+- **Otomatik Export:** Uygulama kapandığında o günün verilerini otomatik olarak metin dosyasına yazar.
+- **Akıllı Format:** Ardışık aynı aktiviteler birleştirilir ve aradaki molalar (`- break`) otomatik tespit edilir.
+- **Konum:** Raporlar uygulamanın (veya EXE'nin) yanındaki `Exports/` klasöründe saklanır.
 
 ## 📂 Proje Yapısı
 ```text
 /Time-Reporter
 ├── main.py              # Uygulama giriş noktası
-├── run.bat              # Windows başlatıcı
-├── time_reporter.db     # Veritabanı (çalışma anında oluşur)
+├── build.bat            # EXE oluşturma betiği
+├── run.bat              # Geliştirme modu başlatıcı
 ├── requirements.txt     # Bağımlılıklar
-├── AGENTS.md            # Geliştirici rehberi
-├── documentation/       # Raporlar ve dokümanlar
 └── src/
     ├── core/            # Tracker ve Engine mantığı
-    ├── db/              # Veritabanı yöneticisi
-    ├── utils/           # Idle tespiti vb. yardımcılar
-    └── ui/              # (Yapım aşamasında) Arayüz bileşenleri
+    ├── db/              # SQLite veritabanı yönetimi
+    ├── ui/              # CustomTkinter arayüzleri
+    └── utils/           # Tray, Startup, Export ve Idle yardımcıları
 ```
 
 ## 🚀 Sonraki Adımlar
-- [ ] **UI Geliştirme:** CustomTkinter ile modern bir dashboard tasarımı.
-- [ ] **Görselleştirme:** Toplanan verilerin grafiklerle (pasta/çubuk grafik) gösterilmesi.
-- [ ] **Gruplandırma:** Uygulamaların kategorilere ayrılması (İş, Eğlence, Sosyal Medya).
+- [ ] **Gelişmiş Filtreleme:** Özel tarih aralığı seçici.
+- [ ] **Veri Temizleme:** Belirli bir tarihten eski kayıtları silme seçeneği.
+- [ ] **Kategori Ekleme:** Kullanıcının kendi özel kategorilerini oluşturabilmesi.

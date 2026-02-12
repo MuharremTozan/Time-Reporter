@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from datetime import datetime, timedelta
 import logging
+import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib
@@ -56,12 +57,23 @@ class DashboardApp(ctk.CTk):
 
         self.export_button = ctk.CTkButton(
             self.sidebar_frame,
-            text="Export Today's Data",
+            text="Export Today",
             command=self.manual_export,
             fg_color="transparent",
             border_width=2,
+            width=100,
         )
-        self.export_button.grid(row=4, column=0, padx=20, pady=10)
+        self.export_button.grid(row=4, column=0, padx=(20, 5), pady=10, sticky="w")
+
+        self.browse_button = ctk.CTkButton(
+            self.sidebar_frame,
+            text="📁",
+            command=self.open_export_folder,
+            fg_color="transparent",
+            border_width=2,
+            width=40,
+        )
+        self.browse_button.grid(row=4, column=0, padx=(5, 20), pady=10, sticky="e")
 
         # Startup toggle
         self.startup_var = ctk.BooleanVar(value=StartupManager.is_startup_enabled())
@@ -387,13 +399,15 @@ class DashboardApp(ctk.CTk):
     def manual_export(self):
         path = self.exporter.export_today()
         if path:
-            # Show a simple popup (ctk doesn't have a standard message box,
-            # but we can use a basic Toplevel or just log it for now)
             logging.info(f"Manual export successful: {path}")
-            # Optional: Open the folder
-            os.startfile(os.path.dirname(path))
         else:
             logging.error("Manual export failed or no data available.")
+
+    def open_export_folder(self):
+        if os.path.exists(self.exporter.export_dir):
+            os.startfile(self.exporter.export_dir)
+        else:
+            logging.error("Export folder does not exist yet.")
 
     def change_appearance_mode(self, new_appearance_mode: str):
         ctk.set_appearance_mode(new_appearance_mode)

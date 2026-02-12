@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from datetime import datetime, timedelta
 
@@ -6,8 +7,17 @@ from datetime import datetime, timedelta
 class ExportManager:
     def __init__(self, db_manager):
         self.db = db_manager
-        app_data = os.getenv("APPDATA") or os.path.expanduser("~")
-        self.export_dir = os.path.join(app_data, "TimeReporter", "Exports")
+        # Uygulama dizininde 'Exports' klasörü oluştur
+        if getattr(sys, "frozen", False):
+            # EXE olarak çalışıyorsa EXE'nin yanına
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            # Script olarak çalışıyorsa projenin kök dizinine
+            base_dir = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
+
+        self.export_dir = os.path.join(base_dir, "Exports")
 
         if not os.path.exists(self.export_dir):
             os.makedirs(self.export_dir)
@@ -36,6 +46,7 @@ class ExportManager:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(f"--- Activity Report: {date_str} ---\n\n")
 
+                last_label = None
                 last_end_time = None
 
                 for block in raw_blocks:
@@ -44,17 +55,23 @@ class ExportManager:
                     app_name = block["app_name"]
                     category = self.db.get_app_category(app_name)
 
+                    # Label determination
+                    label = category if category != "Uncategorized" else app_name
+                    label = label.lower()
+
                     # Check for gaps (Breaks)
                     if last_end_time:
                         gap = (start_time - last_end_time).total_seconds()
                         if gap > 120:  # Gap > 2 minutes is a break
                             break_time = last_end_time.strftime("%H:%M")
                             f.write(f"{break_time} - break\n")
+                            last_label = "break"
 
-                    time_str = start_time.strftime("%H:%M")
-                    # Use category if available, otherwise app name
-                    label = category if category != "Uncategorized" else app_name
-                    f.write(f"{time_str} - {label.lower()}\n")
+                    # Only write if the label has changed or after a break
+                    if label != last_label:
+                        time_str = start_time.strftime("%H:%M")
+                        f.write(f"{time_str} - {label}\n")
+                        last_label = label
 
                     last_end_time = end_time
 
@@ -74,6 +91,7 @@ class ExportManager:
             import sqlite3
 
             conn.row_factory = sqlite3.Row
+            # Using strftime('%Y-%m-%d', start_time) to ensure we match exactly the date part
             cursor = conn.execute(
                 "SELECT * FROM activity_blocks WHERE date(start_time) = ? ORDER BY start_time ASC",
                 (date_str,),
