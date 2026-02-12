@@ -5,10 +5,12 @@ from src.utils.resources import get_resource_path
 
 
 class TrayIcon:
-    def __init__(self, on_show, on_exit):
+    def __init__(self, on_show, on_exit, on_toggle_break=None):
         self.on_show = on_show
         self.on_exit = on_exit
+        self.on_toggle_break = on_toggle_break
         self.icon = None
+        self.is_on_break = False
         self._setup_tray()
 
     def _get_icon_image(self):
@@ -30,11 +32,25 @@ class TrayIcon:
         )
         return image
 
+    def _toggle_break_internal(self, icon, item):
+        if self.on_toggle_break:
+            self.is_on_break = self.on_toggle_break()
+            if self.is_on_break:
+                self.notify("Time Reporter", "Mola Başladı - Mola süresi kaydediliyor.")
+            else:
+                self.notify("Time Reporter", "Çalışma Başladı - Takip sistemi aktif.")
+            # The menu items update dynamically when the menu is shown again
+            # as long as we use a function for the title or recreate the menu.
+
     def _setup_tray(self):
         import pystray
 
+        def get_break_label(item):
+            return "Molayı Durdur" if self.is_on_break else "Mola Ver"
+
         menu = pystray.Menu(
             pystray.MenuItem("Show Dashboard", self.on_show),
+            pystray.MenuItem(get_break_label, self._toggle_break_internal),
             pystray.MenuItem("Exit", self.on_exit),
         )
         self.icon = pystray.Icon(

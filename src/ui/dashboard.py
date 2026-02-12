@@ -195,6 +195,7 @@ class DashboardApp(ctk.CTk):
         self.stats_tabview.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
         self.stats_tabview.add("By Application")
         self.stats_tabview.add("By Category")
+        self.stats_tabview.add("Weekly Trends")
 
         # Containers for the charts
         self.app_chart_container = ctk.CTkFrame(
@@ -206,6 +207,11 @@ class DashboardApp(ctk.CTk):
             self.stats_tabview.tab("By Category"), fg_color="transparent"
         )
         self.cat_chart_container.pack(fill="both", expand=True)
+
+        self.weekly_chart_container = ctk.CTkFrame(
+            self.stats_tabview.tab("Weekly Trends"), fg_color="transparent"
+        )
+        self.weekly_chart_container.pack(fill="both", expand=True)
 
     def _setup_categories_view(self):
         self.categories_frame.grid_columnconfigure(0, weight=1)
@@ -313,7 +319,20 @@ class DashboardApp(ctk.CTk):
             variable=self.startup_var,
         ).pack(side="left", padx=20, pady=10)
 
-        # 5. Theme
+        # 5. Merge Browsing (New Feature)
+        merge_group = ctk.CTkFrame(container)
+        merge_group.pack(fill="x", pady=10)
+
+        self.merge_browsing_var = ctk.BooleanVar(
+            value=self.db.get_setting("merge_short_browsing", "False") == "True"
+        )
+        ctk.CTkCheckBox(
+            merge_group,
+            text="Merge short browsing (<5m) into Development",
+            variable=self.merge_browsing_var,
+        ).pack(side="left", padx=20, pady=10)
+
+        # 6. Theme
         theme_group = ctk.CTkFrame(container)
         theme_group.pack(fill="x", pady=10)
 
@@ -409,6 +428,16 @@ class DashboardApp(ctk.CTk):
                 side="right"
             )
 
+            del_btn = ctk.CTkButton(
+                row,
+                text="🗑",
+                width=30,
+                fg_color="transparent",
+                hover_color="#A30000",
+                command=lambda b_id=block["id"]: self.delete_activity_block(b_id),
+            )
+            del_btn.pack(side="right", padx=(10, 0))
+
         # Auto refresh charts if stats view is active
         if self.stats_frame.winfo_viewable():
             self.render_stats_charts()
@@ -416,9 +445,13 @@ class DashboardApp(ctk.CTk):
         self.after(30000, self.refresh_data)
 
     def render_stats_charts(self):
-        """Renders both application and category pie charts."""
+        """Renders application, category and weekly trend charts."""
         # Clear containers
-        for container in [self.app_chart_container, self.cat_chart_container]:
+        for container in [
+            self.app_chart_container,
+            self.cat_chart_container,
+            self.weekly_chart_container,
+        ]:
             for widget in container.winfo_children():
                 widget.destroy()
 
@@ -450,6 +483,12 @@ class DashboardApp(ctk.CTk):
             f"Category Usage ({range_val})",
         )
 
+        # 3. Weekly Trend Chart
+        weekly_stats = self.db.get_daily_usage_stats(days=7)
+        self._draw_bar_chart(
+            self.weekly_chart_container, weekly_stats, "Weekly Activity (last 7 days)"
+        )
+
     def _draw_pie_chart(self, container, stats, label_key, title):
         if not stats:
             ctk.CTkLabel(container, text="No data available yet.").pack(expand=True)
@@ -476,6 +515,43 @@ class DashboardApp(ctk.CTk):
             textprops={"color": "w"},
         )
         ax.set_title(title, color="white", pad=10)
+
+        canvas = FigureCanvasTkAgg(fig, master=container)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        plt.close(fig)
+
+    def _draw_bar_chart(self, container, stats, title):
+        if not stats:
+            ctk.CTkLabel(container, text="No data available yet.").pack(expand=True)
+            return
+
+        dates = [s["date"] for s in stats]
+        # Convert YYYY-MM-DD to DD/MM
+        labels = [datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m") for d in dates]
+        durations = [s["total_duration"] / 60 for s in stats]  # Hours
+
+        fig, ax = plt.subplots(figsize=(5, 5), facecolor="#2B2B2B")
+        ax.set_facecolor("#2B2B2B")
+
+        bars = ax.bar(labels, durations, color="#1f538d")
+
+        ax.set_title(title, color="white", pad=10)
+        ax.set_ylabel("Hours", color="white")
+        ax.tick_params(axis="x", colors="white")
+        ax.tick_params(axis="y", colors="white")
+
+        # Add value labels on top of bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height,
+                f"{height:.1f}h",
+                ha="center",
+                va="bottom",
+                color="white",
+            )
 
         canvas = FigureCanvasTkAgg(fig, master=container)
         canvas.draw()
@@ -561,7 +637,11 @@ class DashboardApp(ctk.CTk):
             enabled = self.startup_var.get()
             StartupManager.set_startup(enabled)
 
-            # 5. Appearance
+            # 5. Merge Browsing
+            merge_val = "True" if self.merge_browsing_var.get() else "False"
+            self.db.set_setting("merge_short_browsing", merge_val)
+
+            # 6. Appearance
             ctk.set_appearance_mode(self.theme_option.get())
 
             # Notify Engine
@@ -613,6 +693,10 @@ class DashboardApp(ctk.CTk):
             os.startfile(self.exporter.export_dir)
         else:
             logging.error("Export folder does not exist yet.")
+
+    def delete_activity_block(self, block_id):
+        self.db.delete_block(block_id)
+        self.refresh_data()
 
     def set_engine(self, engine):
         self.engine = engine

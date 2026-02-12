@@ -9,7 +9,7 @@ from src.utils.idle import is_user_idle, get_idle_duration
 
 
 class TrackingEngine:
-    def __init__(self, db_manager: DatabaseManager, interval: int = 60):
+    def __init__(self, db_manager: DatabaseManager, interval: int = 10):
         self.db = db_manager
         self.interval = interval
         self.is_running = False
@@ -21,13 +21,19 @@ class TrackingEngine:
         self.is_in_idle_mode = False
         self.idle_started_at = None
         self.on_idle_return_callback = None  # Will be set by UI
+        self.is_manual_break = False
+        self.manual_break_start = None
+        self.merge_short_browsing = False
         self.reload_settings()
 
     def reload_settings(self):
         """Reloads configuration from the database."""
         self.idle_threshold = int(self.db.get_setting("idle_threshold", "300"))
+        self.merge_short_browsing = (
+            self.db.get_setting("merge_short_browsing", "False") == "True"
+        )
         logging.info(
-            f"Engine settings reloaded. Idle Threshold: {self.idle_threshold}s"
+            f"Engine settings reloaded. Idle Threshold: {self.idle_threshold}s, Merge Short Browsing: {self.merge_short_browsing}"
         )
 
     def start(self):
@@ -73,8 +79,59 @@ class TrackingEngine:
             except Exception as e:
                 logging.error(f"Heartbeat error: {e}")
 
+    def toggle_manual_break(self):
+        """Toggles manual break state. Returns True if break started, False if ended."""
+        now = datetime.now()
+        if not self.is_manual_break:
+            # Start Break
+            self.is_manual_break = True
+            self.manual_break_start = now
+
+            # Finalize current block until now
+            last_block = self.db.get_last_block()
+            if last_block:
+                start_time = (
+                    datetime.fromisoformat(last_block["start_time"])
+                    if isinstance(last_block["start_time"], str)
+                    else last_block["start_time"]
+                )
+                duration = max(1, int((now - start_time).total_seconds() / 60))
+                self.db.update_last_block(last_block["id"], duration, end_time=now)
+
+            # Create a special "Break" block
+            self.db.create_block("Break", "Manual Break Session")
+            logging.info("Manual break started.")
+            return True
+        else:
+            # End Break
+            self.is_manual_break = False
+
+            # Finalize the break block
+            last_block = self.db.get_last_block()
+            if last_block and last_block["app_name"] == "Break":
+                start_time = (
+                    datetime.fromisoformat(last_block["start_time"])
+                    if isinstance(last_block["start_time"], str)
+                    else last_block["start_time"]
+                )
+                duration = max(1, int((now - start_time).total_seconds() / 60))
+                self.db.update_last_block(last_block["id"], duration, end_time=now)
+
+            self.manual_break_start = None
+
+            # Start tracking current window again
+            info = get_active_window_info()
+            if info:
+                self.db.create_block(info[0], info[1])
+
+            logging.info("Manual break ended.")
+            return False
+
     def _on_window_change(self, app_name, window_title):
         """Called immediately by the Windows Hook signal."""
+        if self.is_manual_break:
+            return
+
         idle_sec = get_idle_duration()
         logging.debug(f"Window Change: {app_name} (Idle: {idle_sec:.1f}s)")
 
@@ -96,12 +153,43 @@ class TrackingEngine:
             return
 
         last_block = self.db.get_last_block()
+
+        # Feature: Merge short browsing into development
+        if (
+            self.merge_short_browsing
+            and last_block
+            and last_block["duration_minutes"] < 5
+        ):
+            last_cat = self.db.get_app_category(last_block["app_name"])
+            if last_cat == "Browsing":
+                blocks = self.db.get_recent_blocks(limit=2)
+                if len(blocks) == 2:
+                    prev_cat = self.db.get_app_category(blocks[1]["app_name"])
+                    if prev_cat == "Development":
+                        self.db.merge_last_two_blocks()
+                        last_block = self.db.get_last_block()  # Refresh after merge
+
         if not last_block or last_block["app_name"] != app_name:
             self.db.create_block(app_name, window_title)
             logging.info(f"Signal: New block -> {app_name}")
 
     def _heartbeat_tick(self):
         """Increments duration of the active block or detects return from idle."""
+        if self.is_manual_break:
+            # Just increment the "Break" block duration
+            last_block = self.db.get_last_block()
+            if last_block and last_block["app_name"] == "Break":
+                start_time = (
+                    datetime.fromisoformat(last_block["start_time"])
+                    if isinstance(last_block["start_time"], str)
+                    else last_block["start_time"]
+                )
+                new_duration = max(
+                    1, int((datetime.now() - start_time).total_seconds() / 60)
+                )
+                self.db.update_last_block(last_block["id"], new_duration)
+            return
+
         idle_sec = get_idle_duration()
         logging.debug(
             f"Heartbeat tick (Idle: {idle_sec:.1f}s, Threshold: {self.idle_threshold}s)"

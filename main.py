@@ -28,8 +28,8 @@ def main():
         # 3. Initialize UI First
         app = DashboardApp(db_manager)
 
-        # 4. Initialize Engine
-        engine = TrackingEngine(db_manager, interval=60)
+        # 4. Initialize Engine (10s precision)
+        engine = TrackingEngine(db_manager, interval=10)
         engine.on_idle_return_callback = app.show_idle_confirmation
         app.set_engine(engine)
 
@@ -51,7 +51,12 @@ def main():
         def on_tray_show(icon):
             app.after(0, app.show_window)
 
-        tray = TrayIcon(on_show=on_tray_show, on_exit=on_tray_exit)
+        def on_toggle_break():
+            return engine.toggle_manual_break()
+
+        tray = TrayIcon(
+            on_show=on_tray_show, on_exit=on_tray_exit, on_toggle_break=on_toggle_break
+        )
         tray_thread = threading.Thread(target=tray.run, daemon=True)
         tray_thread.start()
 
