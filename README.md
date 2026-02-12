@@ -52,7 +52,7 @@ Unlike cloud-based trackers, **Time Reporter** is built for privacy-conscious de
 ### Installation (Source)
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/Time-Reporter.git
+   git clone https://github.com/MuharremTozan/Time-Reporter.git
    cd Time-Reporter
    ```
 2. Run the automated setup and launcher:
