@@ -1,34 +1,102 @@
-# Time Reporter - Local Time Tracking App
+# 🕒 Time Reporter
 
-Bu uygulama, kullanıcının Windows üzerinde hangi pencerede ne kadar vakit geçirdiğini otomatik olarak takip eden ve yerel bir veritabanında raporlayan bir masaüstü uygulamasıdır.
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform](https://img.shields.io/badge/platform-windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
-## Neden Python?
-- **Düşük Kaynak Tüketimi:** Electron gibi ağır frameworkler yerine sistem kaynaklarını minimal tüketen bir yapı tercih edildi.
-- **Native API Erişimi:** Windows Win32 API'lerine `pywin32` ile doğrudan ve kolay erişim.
-- **Hızlı Prototipleme:** Veri işleme ve SQLite entegrasyonu için ideal.
+**Time Reporter** is a lightweight, local-first desktop application designed to track your daily activities on Windows. It automatically monitors which applications you are using and organizes them into meaningful time blocks, helping you understand where your time goes without compromising your privacy.
 
-## Proje Yol Haritası
+---
 
-### Faz 1: Altyapı ve Takip (Background Engine)
-- [ ] Proje ortamının hazırlanması (Virtualenv, dependencies).
-- [ ] SQLite veritabanı şemasının tasarımı (Sessions, Windows, Activities).
-- [ ] Arka planda aktif pencereyi ve uygulama adını yakalayan `tracker` modülünün yazılması.
-- [ ] Boşta kalma (Idle time) tespiti (Klavye/Mouse hareket yoksa takibi durdurma).
+## ✨ Key Features
 
-### Faz 2: Veri Yönetimi
-- [ ] Verilerin periyodik olarak SQLite'a kaydedilmesi.
-- [ ] Uygulama gruplandırma mantığı (Örn: `chrome.exe` altındaki "YouTube" ve "Gmail" başlıklarını ayırt etme veya birleştirme).
+- **🚀 Hybrid Tracking Engine:** 
+  - **Event-Driven:** Uses Windows Hooks (`WinEventHook`) to detect window switches instantly.
+  - **Heartbeat:** Periodic updates every 60 seconds to ensure accuracy even during long sessions.
+- **⚡ Pro Performance:** Multi-threaded architecture with a non-polling message pump, resulting in **~0% CPU usage**.
+- **🔒 Privacy First:** All data is stored locally in a SQLite database. No cloud, no tracking, no data leakage.
+- **💤 Smart Idle Detection:** Automatically pauses tracking if no user input (mouse/keyboard) is detected for a specified duration (default: 5 mins).
+- **📊 Time-Block Logic:** Groups continuous activity into single blocks instead of cluttered per-minute records.
+- **📦 Zero Configuration:** Comes with a `run.bat` for automatic environment setup and launch.
 
-### Faz 3: Arayüz (Frontend - Desktop UI)
-- [ ] `CustomTkinter` veya `PyQt6` kullanarak ana dashboard tasarımı.
-- [ ] Günlük/Haftalık zaman bloklarını gösteren grafiksel raporlar.
-- [ ] Sistem tepsisi (System Tray) entegrasyonu (Uygulamanın arka planda görünmez çalışması).
+---
 
-### Faz 4: Paketleme
-- [ ] Uygulamanın `.exe` haline getirilmesi.
-- [ ] Başlangıçta çalıştırma (Startup) ayarı.
+## 🛠 Tech Stack
 
-## Teknik Yığın (Tech Stack)
-- **Dil:** Python 3.x
-- **Veritabanı:** SQLite
-- **Kütüphaneler:** `pywin32`, `customtkinter`, `pandas` (raporlama için), `pyinstaller`
+- **Core:** Python 3.10+
+- **APIs:** `pywin32` (Win32 API), `ctypes`
+- **Database:** SQLite
+- **UI:** CustomTkinter (Coming Soon)
+- **Utilities:** `psutil`
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Windows 10/11
+- Python 3.10 or higher
+
+### Installation & Run
+The easiest way to start is using the provided batch file:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/Time-Reporter.git
+   cd Time-Reporter
+   ```
+2. Double-click **`run.bat`**.
+   - This will automatically create a virtual environment, install dependencies, and start the application.
+
+---
+
+## 📂 Project Structure
+
+```text
+/Time-Reporter
+├── main.py              # Application entry point
+├── run.bat              # One-click launcher for Windows
+├── requirements.txt     # Python dependencies
+├── src/
+│   ├── core/            # Tracking engine & window hooks
+│   ├── db/              # SQLite database management
+│   ├── utils/           # Idle detection & system helpers
+│   └── ui/              # Desktop interface components
+├── documentation/       # Progress reports & technical docs
+└── .agent/              # AI Agent protocols & workflows
+```
+
+---
+
+## 🗺 Roadmap
+
+- [x] Core Tracking Engine (Hybrid Model)
+- [x] SQLite Integration
+- [x] Idle Detection Logic
+- [x] Multi-threaded Architecture
+- [ ] **Modern Dashboard (CustomTkinter)**
+- [ ] **Data Visualization (Charts & Analytics)**
+- [ ] Application Categorization (Work, Play, Social)
+- [ ] System Tray Integration
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## 🤝 Contributing
+
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+*Developed with ❤️ by Muharrem Tozan*
