@@ -45,8 +45,10 @@ The easiest way to start is using the provided batch file:
    git clone https://github.com/yourusername/Time-Reporter.git
    cd Time-Reporter
    ```
-2. Double-click **`run.bat`**.
-   - This will automatically create a virtual environment, install dependencies, and start the application.
+2. **Standard Run:** Double-click **`run.bat`**. (Shows terminal for logs)
+3. **Professional Build:** Double-click **`build.bat`**. 
+   - This creates a standalone **`main.exe`** in the `dist/` folder.
+   - The EXE runs **without a terminal window**, perfectly hidden in the background while the UI stays visible.
 
 ---
 
