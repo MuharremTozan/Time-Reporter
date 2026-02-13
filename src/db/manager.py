@@ -223,8 +223,11 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def create_block(self, app_name: str, window_title: str):
-        now = datetime.now()
+    def create_block(
+        self, app_name: str, window_title: str, start_time: datetime | None = None
+    ):
+        if start_time is None:
+            start_time = datetime.now()
         conn = self._get_connection()
         try:
             with conn:
@@ -233,7 +236,7 @@ class DatabaseManager:
                     INSERT INTO activity_blocks (app_name, window_title, start_time, end_time, duration_minutes)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (app_name, window_title, now, now, 1),
+                    (app_name, window_title, start_time, start_time, 1),
                 )
         finally:
             conn.close()

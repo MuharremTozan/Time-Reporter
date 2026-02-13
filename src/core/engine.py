@@ -2,16 +2,24 @@ from datetime import datetime, timedelta
 import threading
 import time
 import logging
+from typing import Callable
 import win32gui
 from src.db.manager import DatabaseManager
 from src.core.tracker import get_active_window_info, WindowEventObserver
 from src.utils.idle import is_user_idle, get_idle_duration
+from src.utils.exporter import ExportManager
 
 
 class TrackingEngine:
-    def __init__(self, db_manager: DatabaseManager, interval: int = 10):
+    def __init__(
+        self,
+        db_manager: DatabaseManager,
+        interval: int = 10,
+        exporter: ExportManager | None = None,
+    ):
         self.db = db_manager
         self.interval = interval
+        self.exporter = exporter
         self.is_running = False
         self.observer = WindowEventObserver(self._on_window_change)
         self._stop_event = threading.Event()
@@ -20,10 +28,13 @@ class TrackingEngine:
         self.idle_threshold = int(self.db.get_setting("idle_threshold", "300"))
         self.is_in_idle_mode = False
         self.idle_started_at = None
-        self.on_idle_return_callback = None  # Will be set by UI
+        self.on_idle_return_callback: Callable[[datetime, datetime], None] | None = (
+            None  # Will be set by UI
+        )
         self.is_manual_break = False
         self.manual_break_start = None
         self.merge_short_browsing = False
+        self.last_date = datetime.now().date()
         self.reload_settings()
 
     def reload_settings(self):
@@ -78,6 +89,43 @@ class TrackingEngine:
                 self._heartbeat_tick()
             except Exception as e:
                 logging.error(f"Heartbeat error: {e}")
+
+    def _handle_midnight_transition(self, now: datetime):
+        """Truncates current day data and starts fresh for the new day."""
+        old_date = self.last_date
+        old_date_str = str(old_date)
+
+        # 1. Finalize the current block at exactly 23:59:59 of the old day
+        last_block = self.db.get_last_block()
+        if last_block:
+            end_of_old_day = datetime.combine(old_date, datetime.max.time())
+            start_time = (
+                datetime.fromisoformat(last_block["start_time"])
+                if isinstance(last_block["start_time"], str)
+                else last_block["start_time"]
+            )
+            duration = max(1, int((end_of_old_day - start_time).total_seconds() / 60))
+            self.db.update_last_block(
+                last_block["id"], duration, end_time=end_of_old_day
+            )
+
+            # 2. Trigger auto-export for the concluded day
+            if self.exporter:
+                try:
+                    self.exporter.export_date(old_date_str)
+                except Exception as e:
+                    logging.error(f"Midnight auto-export failed: {e}")
+
+            # 3. Start a new block at 00:00:00 of the new day
+            start_of_new_day = datetime.combine(now.date(), datetime.min.time())
+            self.db.create_block(
+                last_block["app_name"],
+                last_block["window_title"],
+                start_time=start_of_new_day,
+            )
+
+        self.last_date = now.date()
+        logging.info(f"Day transition complete. New day is {self.last_date}")
 
     def toggle_manual_break(self):
         """Toggles manual break state. Returns True if break started, False if ended."""
@@ -140,7 +188,7 @@ class TrackingEngine:
             self.is_in_idle_mode = False
             return_time = datetime.now()
             logging.info(f"User returned from idle (via Hook) at: {return_time}")
-            if self.on_idle_return_callback:
+            if self.on_idle_return_callback and self.idle_started_at:
                 self.on_idle_return_callback(self.idle_started_at, return_time)
             self.idle_started_at = None
 
@@ -175,6 +223,16 @@ class TrackingEngine:
 
     def _heartbeat_tick(self):
         """Increments duration of the active block or detects return from idle."""
+        now = datetime.now()
+
+        # Midnight Watcher: Handle date transitions
+        if now.date() != self.last_date:
+            logging.info(
+                f"Midnight transition detected: {self.last_date} -> {now.date()}"
+            )
+            self._handle_midnight_transition(now)
+            return
+
         if self.is_manual_break:
             # Just increment the "Break" block duration
             last_block = self.db.get_last_block()
@@ -207,7 +265,7 @@ class TrackingEngine:
             self.is_in_idle_mode = False
             return_time = datetime.now()
             logging.info(f"User returned from idle (via Heartbeat) at: {return_time}")
-            if self.on_idle_return_callback:
+            if self.on_idle_return_callback and self.idle_started_at:
                 self.on_idle_return_callback(self.idle_started_at, return_time)
             self.idle_started_at = None
             return

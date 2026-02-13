@@ -16,6 +16,9 @@ logging.basicConfig(
 
 
 def main():
+    db_manager = None
+    exporter = None
+    engine = None
     try:
         # 1. Initialize DB & Exporter
         db_manager = DatabaseManager()
@@ -29,7 +32,7 @@ def main():
         app = DashboardApp(db_manager)
 
         # 4. Initialize Engine (10s precision)
-        engine = TrackingEngine(db_manager, interval=10)
+        engine = TrackingEngine(db_manager, interval=10, exporter=exporter)
         engine.on_idle_return_callback = app.show_idle_confirmation
         app.set_engine(engine)
 
@@ -40,10 +43,11 @@ def main():
         # 6. Tray logic
         def on_tray_exit(icon):
             logging.info("Exiting via tray...")
-            try:
-                exporter.export_today()
-            except Exception as e:
-                logging.error(f"Auto-export failed: {e}")
+            if exporter:
+                try:
+                    exporter.export_today()
+                except Exception as e:
+                    logging.error(f"Auto-export failed: {e}")
             icon.stop()
             app.destroy()
             sys.exit(0)
@@ -69,10 +73,11 @@ def main():
 
     except KeyboardInterrupt:
         print("\nStopping Time Reporter...")
-        try:
-            exporter.export_today()
-        except:
-            pass
+        if exporter:
+            try:
+                exporter.export_today()
+            except:
+                pass
         sys.exit(0)
     except Exception as e:
         logging.error(f"Fatal error: {e}")
